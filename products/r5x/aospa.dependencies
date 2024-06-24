@@ -1,0 +1,38 @@
+[
+    {
+        "remote":       "github",
+        "repository":   "pa-r5x/vendor_realme_r5x",
+        "target_path":  "vendor/realme/r5x",
+        "revision":     "wip"
+    },
+    {
+        "remote":       "github",
+        "repository":   "pa-r5x/hardware_qcom_audio",
+        "target_path":  "vendor/qcom/opensource/audio-hal/primary-hal",
+        "revision":     "vauxite-855"
+    },
+    {
+        "remote":       "github",
+        "repository":   "pa-r5x/hardware_qcom_display",
+        "target_path":  "hardware/qcom/display",
+        "revision":     "vauxite-855"
+    },
+    {
+        "remote":       "github",
+        "repository":   "pa-r5x/hardware_qcom_media",
+        "target_path":  "hardware/qcom/media",
+        "revision":     "vauxite-855"
+    },
+    {
+        "remote":       "github",
+        "repository":   "pa-r5x/kernel_realme_r5x",
+        "target_path":  "kernel/realme/r5x",
+        "revision":     "vauxite"
+    },
+    {
+        "remote":       "github",
+        "repository":   "pa-r5x/device_realme_r5x",
+        "target_path":  "device/realme/r5x",
+        "revision":     "wip"
+    }
+]
