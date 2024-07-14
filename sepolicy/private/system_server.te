@@ -24,3 +24,6 @@ add_service(system_server, app_lock_service);
 
 # Freeform
 add_service(system_server, lmofreeform_service);
+
+# Parallel Space
+add_service(system_server, parallel_space_service);

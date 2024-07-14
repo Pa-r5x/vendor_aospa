@@ -18,3 +18,6 @@ app_lock                                    u:object_r:app_lock_service:s0
 
 # Freeform
 lmo_freeform                                u:object_r:lmofreeform_service:s0
+
+# Parallel Space
+parallel                                    u:object_r:parallel_space_service:s0

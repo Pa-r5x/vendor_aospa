@@ -71,6 +71,10 @@ $(call inherit-product-if-exists, packages/services/VncFlinger/product.mk)
 PRODUCT_PACKAGES += \
     OmniJaws \
 
+# Parallel Space
+PRODUCT_PACKAGES += \
+    ParallelSpace
+
 # APNs
 ifneq ($(TARGET_NO_TELEPHONY), true)
 PRODUCT_COPY_FILES += \
