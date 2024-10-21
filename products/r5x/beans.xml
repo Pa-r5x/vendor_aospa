@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<manifest>
+  <include name="../platforms/trinket.xml" />
+
+  <project path="device/realme/r5x" name="Pa-r5x/device_realme_r5x" remote="github" revision="vauxite" />
+  <project path="kernel/realme/r5x" name="Pa-r5x/kernel_realme_r5x" remote="github" revision="vauxite" clone-depth="1" />
+  <project path="vendor/realme/r5x" name="Pa-r5x/vendor_realme_r5x" remote="github" revision="vauxite" />
+</manifest>
