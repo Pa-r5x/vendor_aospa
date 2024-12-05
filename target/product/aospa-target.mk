@@ -54,6 +54,10 @@ PRODUCT_PRODUCT_PROPERTIES += \
     ro.launcher.blur.appLaunch=0
 endif
 
+# Camelot
+PRODUCT_PACKAGES += \
+    Camelot
+
 # UDFPS Animation effects
 PRODUCT_PACKAGES += \
     UdfpsAnimations
