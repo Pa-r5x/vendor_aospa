@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # AOSPA build helper script
 
-export TERM=xterm
-
 # red = errors, cyan = warnings, green = confirmations, blue = informational
 # plain for generic text, bold for titles, reset flag at each end of line
 # plain blue should not be used for readability reasons - use plain cyan instead
@@ -16,13 +14,9 @@ CLR_BLD_RED=$CLR_RST$CLR_BLD$(tput setaf 1) #  red, bold
 CLR_BLD_GRN=$CLR_RST$CLR_BLD$(tput setaf 2) #  green, bold
 CLR_BLD_BLU=$CLR_RST$CLR_BLD$(tput setaf 4) #  blue, bold
 CLR_BLD_CYA=$CLR_RST$CLR_BLD$(tput setaf 6) #  cyan, bold
-CLR_BLD_YLW=$CLR_RST$CLR_BLD$(tput setaf 3) #  yellow, bold
 
 # Set defaults
-AOSPA_VARIANT="alpha"
-JOBS="12"
-DEVICE="oneplus7t"
-SHA256="prebuilts/build-tools/path/linux-x86/sha256sum"
+BUILD_TYPE="userdebug"
 
 function checkExit () {
     EXIT_CODE=$?
@@ -33,66 +27,63 @@ function checkExit () {
     fi
 }
 
-# Use CCACHE
-if [ "$Use_CCACHE" = "Yes" ]; then
-echo -e""
-echo -e "${CLR_BLD_CYA}CCACHE is Enabled for this Build${CLR_RST}"
-export CCACHE_EXEC=$(which ccache)
-export USE_CCACHE=1
-export CCACHE_DIR=/home/ccache/fazil
-ccache -M 98G
-fi
-
-if [ "$Use_CCACHE" = "Clean" ]; then
-export CCACHE_EXEC=$(which ccache)
-export CCACHE_DIR=/home/ccache/fazil
-ccache -C
-export USE_CCACHE=1
-ccache -M 98G
-wait
-echo -e "${CLR_BLD_GRN}CCACHE Cleared${CLR_RST}"
-fi
-
-# Set thin lto ccache DIR
-export THINLTO_CACHE_DIR=/home/ccache/fazil/tlto
-
-# Its Clean Time
-if [ "$Build" = "Clean" ]; then
-rm -rf out
-export FLAG_CLEAN_BUILD=y
-fi
-
-# Install Clean
-if [ "$Build" = "Install Clean" ]; then
-export FLAG_INSTALLCLEAN_BUILD=y
-fi
-
-# BUILD_TYPE
-if [ "$Build_type" ]; then
-export BUILD_TYPE="$Build_type"
-fi
-
-# Repo Sync
-if [ "$Sync" = "true" ]; then
-export FLAG_SYNC=y
-fi
-
-# Fastboot image
-if [ "$Fastboot_zip" = "true" ]; then
-export FLAG_IMG_ZIP=y
-fi
-
-# Delta OTA
-if [ "$Delta_OTA" = "true" ]; then
-   export DELTA_TARGET_FILES="aospa-$DEVICE-target_files-$PREV_FILE_TAG.zip"
-    if [ ! -f "$(pwd)/$DELTA_TARGET_FILES" ]; then
-        echo -e "${CLR_BLD_RED}error: target delta file not found!${CLR_RST}"
+# Output usage help
+function showHelpAndExit {
+        echo -e "${CLR_BLD_BLU}Usage: $0 <device> [options]${CLR_RST}"
+        echo -e ""
+        echo -e "${CLR_BLD_BLU}Options:${CLR_RST}"
+        echo -e "${CLR_BLD_BLU}  -h, --help            Display this help message${CLR_RST}"
+        echo -e "${CLR_BLD_BLU}  -c, --clean           Wipe the tree before building${CLR_RST}"
+        echo -e "${CLR_BLD_BLU}  -i, --installclean    Dirty build - Use 'installclean'${CLR_RST}"
+        echo -e "${CLR_BLD_BLU}  -r, --repo-sync       Sync before building${CLR_RST}"
+        echo -e "${CLR_BLD_BLU}  -v, --variant         AOSPA variant - Can be alpha, beta or stable${CLR_RST}"
+        echo -e "${CLR_BLD_BLU}  -t, --build-type      Specify build type${CLR_RST}"
+        echo -e "${CLR_BLD_BLU}  -j, --jobs            Specify jobs/threads to use${CLR_RST}"
+        echo -e "${CLR_BLD_BLU}  -m, --module          Build a specific module${CLR_RST}"
+        echo -e "${CLR_BLD_BLU}  -s, --sign-keys       Specify path to sign key mappings${CLR_RST}"
+        echo -e "${CLR_BLD_BLU}  -p, --pwfile          Specify path to sign key password file${CLR_RST}"
+        echo -e "${CLR_BLD_BLU}  -b, --backup-unsigned Store a copy of unsigned package along with signed${CLR_RST}"
+        echo -e "${CLR_BLD_BLU}  -d, --delta           Generate a delta ota from the specified target_files zip${CLR_RST}"
+        echo -e "${CLR_BLD_BLU}  -z, --imgzip          Generate fastboot flashable image zip from signed target_files${CLR_RST}"
+        echo -e "${CLR_BLD_BLU}  -n, --version         Specify build minor version (number)${CLR_RST}"
         exit 1
-    fi
-fi
+}
 
-# Sign Build
-export KEY_MAPPINGS="vendor/aospa/signing/keys"
+# Setup getopt.
+long_opts="help,clean,installclean,repo-sync,variant:,build-type:,jobs:,module:,sign-keys:,pwfile:,backup-unsigned,delta:,imgzip,version:"
+getopt_cmd=$(getopt -o hcirv:t:j:m:s:p:bd:zn: --long "$long_opts" \
+            -n $(basename $0) -- "$@") || \
+            { echo -e "${CLR_BLD_RED}\nError: Getopt failed. Extra args\n${CLR_RST}"; showHelpAndExit; exit 1;}
+
+eval set -- "$getopt_cmd"
+
+while true; do
+    case "$1" in
+        -h|--help|h|help) showHelpAndExit;;
+        -c|--clean|c|clean) FLAG_CLEAN_BUILD=y;;
+        -i|--installclean|i|installclean) FLAG_INSTALLCLEAN_BUILD=y;;
+        -r|--repo-sync|r|repo-sync) FLAG_SYNC=y;;
+        -v|--variant|v|variant) AOSPA_VARIANT="$2"; shift;;
+        -t|--build-type|t|build-type) BUILD_TYPE="$2"; shift;;
+        -j|--jobs|j|jobs) JOBS="$2"; shift;;
+        -m|--module|m|module) MODULES+=("$2"); echo $2; shift;;
+        -s|--sign-keys|s|sign-keys) KEY_MAPPINGS="$2"; shift;;
+        -p|--pwfile|p|pwfile) PWFILE="$2"; shift;;
+        -b|--backup-unsigned|b|backup-unsigned) FLAG_BACKUP_UNSIGNED=y;;
+        -d|--delta|d|delta) DELTA_TARGET_FILES="$2"; shift;;
+        -z|--imgzip|img|imgzip) FLAG_IMG_ZIP=y;;
+        -n|--version|n|version) AOSPA_USER_VERSION="$2"; shift;;
+        --) shift; break;;
+    esac
+    shift
+done
+
+# Mandatory argument
+if [ $# -eq 0 ]; then
+    echo -e "${CLR_BLD_RED}Error: No device specified${CLR_RST}"
+    showHelpAndExit
+fi
+export DEVICE="$1"; shift
 
 # Make sure we are running on 64-bit before carrying on with anything
 ARCH=$(uname -m | sed 's/x86_//;s/i[3-6]86/32/')
@@ -101,18 +92,8 @@ if [ "$ARCH" != "64" ]; then
         exit 1
 fi
 
-# Perform a build from scratch by resyncing everything!
-if [ "$Remove_AOSPA" = "true" ]; then
-    rm -rf aospa
-    mkdir aospa
-    cd aospa
-    repo init -u https://github.com/pa-faiz/manifest -b vauxite --depth=1
-    echo -e "${CLR_BLD_YLW}Syncing with latest source${CLR_RST}"
-    repo sync --current-branch --no-tags -j12
-    cd ../
-fi
-
 # Set up paths
+cd $(dirname $0)
 DIR_ROOT=$(pwd)
 
 # Make sure everything looks sane so far
@@ -174,6 +155,20 @@ if [ $AOSPA_BUILDVERSION ]; then
     AOSPA_DISPLAY_VERSION+="$AOSPA_BUILDVERSION"
 fi
 
+# Prep for a clean build, if requested so
+if [ "$FLAG_CLEAN_BUILD" = 'y' ]; then
+        echo -e "${CLR_BLD_BLU}Cleaning output files left from old builds${CLR_RST}"
+        echo -e ""
+        m clobber "$CMD"
+fi
+
+# Sync up, if asked to
+if [ "$FLAG_SYNC" = 'y' ]; then
+        echo -e "${CLR_BLD_BLU}Downloading the latest source files${CLR_RST}"
+        echo -e ""
+        repo sync -j"$JOBS" -c --current-branch --no-tags
+fi
+
 # Check the starting time (of the real build process)
 TIME_START=$(date +%s.%N)
 
@@ -185,70 +180,35 @@ echo -e ""
 # Lunch-time!
 echo -e "${CLR_BLD_BLU}Lunching $DEVICE${CLR_RST} ${CLR_CYA}(Including dependencies sync)${CLR_RST}"
 echo -e ""
-lunch "aospa_$DEVICE-$TARGET_RELEASE-$BUILD_TYPE"
+lunch "aospa_$DEVICE-$BUILD_TYPE"
 AOSPA_VERSION="$(get_build_var AOSPA_VERSION)"
 checkExit
 echo -e ""
 
 # Perform installclean, if requested so
 if [ "$FLAG_INSTALLCLEAN_BUILD" = 'y' ]; then
-	    echo -e "${CLR_BLD_YLW}Cleaning compiled image files left from old builds${CLR_RST}"
-	    echo -e ""
-	    m installclean "$CMD"
-fi
-
-# Prep for a clean build, if requested so
-if [ "$FLAG_CLEAN_BUILD" = 'y' ]; then
-        echo -e "${CLR_BLD_YLW}Cleaning output files left from old builds${CLR_RST}"
-        echo -e ""
-        m clobber "$CMD"
-fi
-
-# Sync up with source, if asked to
-if [ "$FLAG_SYNC" = 'y' ]; then
-        echo -e "${CLR_BLD_YLW}Syncing with latest source${CLR_RST}"
-        echo -e ""
-        repo sync -j"$JOBS" -c --current-branch --no-tags
-fi
-
-# Force Sync up with source, if asked to
-if [ "$Force_Sync" = "true" ]; then
-        echo -e "${CLR_BLD_YLW}Force Syncing with latest source${CLR_RST}"
-        echo -e ""
-        repo sync --force-sync -c --current-branch --no-tags -j12
-fi
-
-# Download KernelSU Patch
-if [ "$KernelSU" = "true" ]; then
-    cd kernel/msm-4.14
-    rm -rf KernelSU && git stash -u > /dev/null
-    git clone https://github.com/tiann/KernelSU -b v0.9.5 KernelSU
+	echo -e "${CLR_BLD_BLU}Cleaning compiled image files left from old builds${CLR_RST}"
+	echo -e ""
+	m installclean "$CMD"
 fi
 
 # Build away!
 echo -e "${CLR_BLD_BLU}Starting compilation${CLR_RST}"
 echo -e ""
 
-# If we aren't in Jenkins, use the engineering tag
-if [ -z "${BUILD_NUMBER}" ]; then
-    export FILE_NAME_TAG=eng.$USER
-else
-    export FILE_NAME_TAG=$BUILD_NUMBER
-fi
-
-# Build a Specific Module
-if [ "${MODULES}" = "NO" ]; then
+# Build a specific module(s)
+if [ "${MODULES}" ]; then
+    m ${MODULES[@]} "$CMD"
     checkExit
 
-    elif [ "${MODULES}" ]; then
-        echo -e "${CLR_BLD_CYA}Building ${MODULES}${CLR_RST}"
-        echo -e ""
-        m ${MODULES[@]} "$CMD"
-        exit 0
+# Build signed rom package if specified
+elif [ "${KEY_MAPPINGS}" ]; then
+    # Set sign key password file if specified
+    if [ "${PWFILE}" ]; then
+        export ANDROID_PW_FILE=$PWFILE
     fi
 
-# Build signed rom package if specified
-if [ "${KEY_MAPPINGS}" ]; then
+    # Make target-files-package
     m otatools target-files-package "$CMD"
 
     checkExit
@@ -256,22 +216,27 @@ if [ "${KEY_MAPPINGS}" ]; then
     echo -e "${CLR_BLD_BLU}Signing target files apks${CLR_RST}"
     sign_target_files_apks -o -d $KEY_MAPPINGS \
         "$OUT"/obj/PACKAGING/target_files_intermediates/aospa_$DEVICE-target_files.zip \
-        aospa-$DEVICE-signed-target_files-$FILE_NAME_TAG.zip
+        aospa-$AOSPA_VERSION-signed-target_files.zip
 
     checkExit
 
     echo -e "${CLR_BLD_BLU}Generating signed install package${CLR_RST}"
     ota_from_target_files -k $KEY_MAPPINGS/releasekey \
         --block ${INCREMENTAL} \
-        aospa-$DEVICE-signed-target_files-$FILE_NAME_TAG.zip \
+        aospa-$AOSPA_VERSION-signed-target_files.zip \
         aospa-$AOSPA_VERSION.zip
 
     checkExit
 
     if [ "$DELTA_TARGET_FILES" ]; then
+        # die if base target doesn't exist
+        if [ ! -f "$DELTA_TARGET_FILES" ]; then
+                echo -e "${CLR_BLD_RED}Delta error: base target files don't exist ($DELTA_TARGET_FILES)${CLR_RST}"
+                exit 1
+        fi
         ota_from_target_files -k $KEY_MAPPINGS/releasekey \
             --block --incremental_from $DELTA_TARGET_FILES \
-            aospa-$DEVICE-signed-target_files-$FILE_NAME_TAG.zip \
+            aospa-$AOSPA_VERSION-signed-target_files.zip \
             aospa-$AOSPA_VERSION-delta.zip
         checkExit
     fi
@@ -279,14 +244,20 @@ if [ "${KEY_MAPPINGS}" ]; then
     if [ "$FLAG_IMG_ZIP" = 'y' ]; then
         echo -e "${CLR_BLD_BLU}Generating signed fastboot package${CLR_RST}"
         img_from_target_files \
-            aospa-$DEVICE-signed-target_files-$FILE_NAME_TAG.zip \
+            aospa-$AOSPA_VERSION-signed-target_files.zip \
             aospa-$AOSPA_VERSION-image.zip
         checkExit
     fi
-
 # Build rom package
 elif [ "$FLAG_IMG_ZIP" = 'y' ]; then
     m otatools target-files-package "$CMD"
+
+    checkExit
+
+    echo -e "${CLR_BLD_BLU}Generating install package${CLR_RST}"
+    ota_from_target_files \
+        "$OUT"/obj/PACKAGING/target_files_intermediates/aospa_$DEVICE-target_files.zip \
+        aospa-$AOSPA_VERSION.zip
 
     checkExit
 
@@ -297,43 +268,14 @@ elif [ "$FLAG_IMG_ZIP" = 'y' ]; then
 
     checkExit
 
-elif [ "$DELTA_TARGET_FILES" ]; then
-    m otatools target-files-package "$CMD"
-    checkExit
-
-    echo -e "${CLR_BLD_BLU}Generating Delta OTA package${CLR_RST}"
-    ota_from_target_files \
-        --block --incremental_from $DELTA_TARGET_FILES \
-        "$OUT"/obj/PACKAGING/target_files_intermediates/aospa_$DEVICE-target_files.zip \
-        aospa-$AOSPA_VERSION-delta.zip
-    checkExit
-
-    sha256sum aospa-$AOSPA_VERSION-delta.zip | cut -d ' ' -f1 > aospa-$AOSPA_VERSION-delta.zip.sha256sum
-    echo -e "${CLR_BLD_GRN}Delta OTA Package Complete${CLR_RST}": "${CLR_CYA}aospa-$AOSPA_VERSION-delta.zip${CLR_RST}"
-    echo -e "size: `ls -lah aospa-$AOSPA_VERSION-delta.zip | cut -d ' ' -f 5`"
-    echo -e "sha256: `cat aospa-$AOSPA_VERSION-delta.zip.sha256sum | cut -d ' ' -f 1`"
 else
     m otapackage "$CMD"
 
     checkExit
 
-    sha256sum aospa-$AOSPA_VERSION.zip | cut -d ' ' -f1 > aospa-$AOSPA_VERSION.zip.sha256sum
-    echo -e "${CLR_BLD_GRN}Package Complete${CLR_RST}": "${CLR_CYA}aospa-$AOSPA_VERSION.zip${CLR_RST}"
-    echo -e "size: `ls -lah aospa-$AOSPA_VERSION.zip | cut -d ' ' -f 5`"
-    echo -e "sha256: `cat aospa-$AOSPA_VERSION.zip.sha256sum | cut -d ' ' -f 1`"
+    cp -f $OUT/aospa_$DEVICE-ota.zip $OUT/aospa-$AOSPA_VERSION.zip
+    echo "Package Complete: $OUT/aospa-$AOSPA_VERSION.zip"
 fi
-
-mv "$OUT"/obj/PACKAGING/target_files_intermediates/aospa_$DEVICE-target_files.zip \
-aospa-$DEVICE-target_files-$FILE_NAME_TAG.zip
-echo -e ""
-echo "    :::      ::::::::   ::::::::  :::::::::      :::     ";
-echo "  :+: :+:   :+:    :+: :+:    :+: :+:    :+:   :+: :+:   ";
-echo " +:+   +:+  +:+    +:+ +:+        +:+    +:+  +:+   +:+  ";
-echo "+#++:++#++: +#+    +:+ +#++:++#++ +#++:++#+  +#++:++#++: ";
-echo "+#+     +#+ +#+    +#+        +#+ +#+        +#+     +#+ ";
-echo "#+#     #+# #+#    #+# #+#    #+# #+#        #+#     #+# ";
-echo "###     ###  ########   ########  ###        ###     ### ";
-echo "            Paranoid Android Project                     ";
 echo -e ""
 
 # Check the finishing time
