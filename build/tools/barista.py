@@ -35,7 +35,9 @@ def sort_manifest(manifest: Element) -> None:
     remove_projects = sorted(
         manifest.findall("remove-project"), key=lambda x: x.get("name", "")
     )
-    projects = sorted(manifest.findall("project"), key=lambda x: x.get("path", ""))
+    projects = sorted(
+        manifest.findall("project"), key=lambda x: x.get("path", x.get("name", ""))
+    )
     manifest.clear()
     manifest.extend(remove_projects + projects)
 
@@ -71,21 +73,24 @@ def grind_beans(device: str) -> list[Element]:
         try:
             manifest = parse(manifest_path).getroot()
 
+            # Process all include files recursively
+            for include_elem in manifest.findall("include"):
+                include_path = manifest_path.parent / include_elem.get("name", "")
+                process_manifest(include_path)
+
             # Process remove-project tags
             for remove_elem in manifest.findall("remove-project"):
                 remove_projects.add(remove_elem.get("name", ""))
 
             # Process project tags
             for project in manifest.findall("project"):
-                path = project.get("path", "")
                 name = project.get("name", "")
-                if name not in remove_projects:
-                    projects[path] = project
+                path = project.get("path", name)
 
-            # Process all include files recursively
-            for include_elem in manifest.findall("include"):
-                include_path = manifest_path.parent / include_elem.get("name", "")
-                process_manifest(include_path)
+                projects[path] = project
+                if name in remove_projects:
+                    remove_projects.remove(name)
+
         except FileNotFoundError:
             print(f"Warning: Include beans not found at {manifest_path}. Skipping.")
         except ParseError:
@@ -139,17 +144,19 @@ def main():
         barista_manifest = Element("manifest")
 
     brewable_projects = []
-    mentioned_projects = [project.get("path", "") for project in projects]
+    mentioned_projects = [
+        project.get("path", project.get("name", "")) for project in projects
+    ]
     changes = []
 
     # Process project elements
     for project in projects:
-        path = project.get("path", "")
         name = project.get("name", "")
+        path = project.get("path", name)
 
         # Check if the project exists in upstream manifest
         for upstream_project in upstream_manifest.findall("project"):
-            if upstream_project.get("path") == path:
+            if upstream_project.get("path", upstream_project.get("name", "")) == path:
                 upstream_name = upstream_project.get("name", "")
                 if not any(
                     rp.get("name") == upstream_name
@@ -161,6 +168,8 @@ def main():
                     )
 
         existing = barista_manifest.find(f".//project[@path='{path}']")
+        if existing is None:
+            existing = barista_manifest.find(f".//project[@name='{path}']")
 
         if existing is None:
             barista_manifest.append(project)
@@ -182,6 +191,13 @@ def main():
             for attr in removed_attrs:
                 del existing.attrib[attr]
 
+            # Handle children elements
+            for child in list(existing):
+                existing.remove(child)
+
+            for child in project:
+                existing.append(child)
+
             if updated_attrs or removed_attrs:
                 changes.extend(
                     f"Updated {attr} for ingredient: {name}" for attr in updated_attrs
@@ -193,8 +209,9 @@ def main():
 
     # Remove projects that are no longer in the ingredient list
     for existing in barista_manifest.findall("project"):
-        if existing.get("path") not in mentioned_projects:
-            path_to_remove = Path(existing.get("path", ""))
+        path = existing.get("path", existing.get("name", ""))
+        if path not in mentioned_projects:
+            path_to_remove = Path(path)
             barista_manifest.remove(existing)
             changes.append(
                 f"Removed ingredient: {existing.get('name')} from {path_to_remove}"
@@ -226,7 +243,8 @@ def main():
         )
         if upstream_project is not None:
             if not any(
-                project.get("path") == upstream_project.get("path")
+                project.get("path", project.get("name", ""))
+                == upstream_project.get("path", upstream_project.get("name", ""))
                 for project in projects
             ):
                 barista_manifest.remove(remove_project)

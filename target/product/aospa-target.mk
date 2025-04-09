@@ -15,6 +15,10 @@
 # Enable support for APEX updates
 $(call inherit-product, $(SRC_TARGET_DIR)/product/updatable_apex.mk)
 
+# b/344511668
+PRODUCT_PACKAGES += \
+    android.software.credentials.prebuilt.xml
+
 # Enable allowlist for some aosp packages that should not be scanned in a "stopped" state
 # Some CTS test case failed after enabling feature config_stopSystemPackagesByDefault
 PRODUCT_PACKAGES += initial-package-stopped-states-aosp.xml
@@ -112,9 +116,6 @@ PRODUCT_MINIMIZE_JAVA_DEBUG_INFO := true
 SYSTEM_OPTIMIZE_JAVA := true
 SYSTEMUI_OPTIMIZE_JAVA := true
 
-# Microsoft
-$(call inherit-product, vendor/aospa/prebuilt/microsoft/packages.mk)
-
 # MTE
 PRODUCT_SYSTEM_EXT_PROPERTIES += \
     persist.arm64.memtag.system_server=off
@@ -136,7 +137,6 @@ $(call inherit-product-if-exists, vendor/aospa/translations/translations.mk)
 # Paranoid Packages
 PRODUCT_PACKAGES += \
     ParanoidPapers \
-    ParanoidSettings \
     ParanoidSystemUI \
     ParanoidThemePicker
 
